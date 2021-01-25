@@ -25,6 +25,8 @@ Run `festival --server` before launching FreeSpace
 - Needs that buffer file festival_buf1.wav
 - __Slow to synthesize long messages. Messages will be truncated or canceled if new message arrives meanwhile.__
   I'll try to fix that by splitting or preparing messages when that buffer issue is resolved.
+- No support for Command Briefings, Briefings or Debriefings. There might be scripting support for
+  getting these texts with the new UI, then I'll try to include them as well.
 
 See also: https://www.hard-light.net/forums/index.php?topic=97279
 Contact me there, via PM or when I'm on Discord for any questions or issues!
