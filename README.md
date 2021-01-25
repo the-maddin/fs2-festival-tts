@@ -3,9 +3,9 @@ Script to forward FSO messages to Festival and play speech
 
 ## How to install
 Software requirements:
-- lua-socket for Lua 5.1 (Provided by lua51-socket on Arch, lua-socket on Debian/Ubuntu)
-- Festival, the free and open source TTS engine (provided by festival on Arch, festival on Debian/Ubuntu)
-- voices for festival (provided by festival-us on Arch, ? on Debian/Ubuntu)
+- lua-socket for Lua 5.1 (Provided by `lua51-socket` on Arch, `lua-socket` on Debian/Ubuntu)
+- Festival, the free and open source TTS engine (provided by `festival` on Arch and Debian/Ubuntu)
+- voices for festival (provided by `festival-us` on Arch, ? on Debian/Ubuntu)
 
 1. Merge the data folder with the one in your top knossos or freespcae folder.
 2. Adjust the variable `rotten-portability-path` to your actual knossos or freespace folder.
