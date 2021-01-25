@@ -8,7 +8,7 @@ Software requirements:
 - voices for festival (provided by `festival-us` on Arch, ? on Debian/Ubuntu)
 
 1. Merge the data folder with the one in your top knossos or freespcae folder.
-2. Adjust the variable `rotten-portability-path` to your actual knossos or freespace folder.
+2. Adjust the variable `rotten_portability_path` to your actual knossos or freespace folder.
    **The file festival_buf1.wav in that folder will be written to!**
 3. Run `festival` in a terminal. Enter `(voice.list)`. The output must contain
    at least `cmu_us_awb_cg` and `cmu_us_slt_cg`.
