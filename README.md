@@ -20,7 +20,6 @@ Run `festival --server` before launching FreeSpace
 ## Known issues
 - ~~Does not override other message sounds.~~
 - ~~Does not yet respect TTS settings in messages.tbl. Only plays when message sound is set to emptymsg.wav~~
-  ~~(Can be temporarily worked around by removing `or fv.Filename:match("emptymsg.wav")` in line 75~~
 
 (The engine now allows scipts to access SimulatedSpeechOverrides)
 - ~~Needs that buffer file festival_buf1.wav~~
