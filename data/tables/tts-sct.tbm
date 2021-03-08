@@ -5,27 +5,14 @@ $On Game Init: [
 
 local lua_socket = require("socket")
 ftts = {
-    -- currently needed for the engine to access sounds  
-    io = require("io"),
-    buf = "festival-buf1.wav",
-----------------------------------------------------------------------------------------------
---IMPORTANT:
---!!!THIS FOLDER WILL BE WRITTEN TO!!!
---You must edit the following path to match your knossos or freespace install directory
---and ensure that the folder exists.
---Put in there the provided "festival-buf1.wav" or you won't get any output on your first run.
---(This sucks and will be altered when the required engine functionality is implemented)
-----------------------------------------------------------------------------------------------
-    rotten_portability_path = "/opt/knossos/FS2/data/voice/special/",
-    
+
     -- client for festival    
     sock = lua_socket.connect("localhost",1314),
     
     -- handles for later
     voice = nil,
-    ofile = nil,
-    soundfile = nil,
-    sound = nil,
+    buf = nil,
+    stream = nil,
     
     -- feature#MULTIVOICE beginnings
     -- will put in here other senders
@@ -34,7 +21,25 @@ ftts = {
         ["Command"] = "cmu_us_slt_cg",
         [""] = "cmu_us_awb_cg",
         -- lol that guy sounds like ...
-    }
+        
+    },
+    
+    -- check if message is not voice acted
+    match_override = function (filename)
+        for i = 1, #tb.SimulatedSpeechOverrides do
+            if filename:find(tb.SimulatedSpeechOverrides[i]) then
+                return tb.SimulatedSpeechOverrides[i]
+            end
+        end
+        return nil
+    end,
+    
+    
+    
+-- uncomment this to turn on debug message socket
+-- you'll need a server listening on port 1315
+-- e.g. "netcat -l 1315" or define another debug function
+    --debug = true,
 }
 
 -- make client nonblocking
@@ -42,28 +47,16 @@ ftts.sock:settimeout(0)
 -- load durations
 ftts.sock:send([[(load "/usr/share/festival/mrpa_durs.scm")]])
 
--- uncomment this to turn on debug message socket
--- you'll need a server listening on port 1315
--- e.g. "netcat -l 1315" or define another debug function
---tts_debug = true
-if tts_debug then
+if ftts.debug then
     local sock_out = lua_socket.connect("localhost", 1315)
-    tts_debug = function (x) sock_out:send(tostring(x) .. "\n") end
+    ftts.debug = function (x) sock_out:send(tostring(x) .. "\n") end
     
     -- what socket does our voice client use
     -- will get interesting for feature#SPLITMSG
     local _,port = ftts.sock:getsockname()
-    tts_debug("Festival socket 1 port:")
-    tts_debug(port)
-    
-    -- file checks
-    tts_debug("Buf file found: " .. ftts.buf)
-    tts_debug(cf.fileExists(ftts.buf))
-    
-    local tts_soundfile = ad.loadSoundfile(ftts.buf)
-    tts_debug("Buf is valid audio:")
-    tts_debug(tts_soundfile:isValid())
-    tts_soundfile:unload()
+    ftts.debug("Festival socket 1 port:")
+    ftts.debug(port)
+
 end
 ]
 
@@ -72,10 +65,10 @@ $On Message Received: [
 
 -- speak message only where no voice acting is present
 local fv = hv.MessageHandle.VoiceFile
-if not fv:isValid() or fv.Filename:match("emptymsg.wav") then
+if not fv:isValid() or ftts.match_override(fv.Filename) then
 
     -- set the voice according to sender (feature#MULTIVOICE), set tempo
-    if tts_debug then tts_debug("Sender: " .. hv.SenderString) end
+    if ftts.debug then ftts.debug("Sender: " .. hv.SenderString) end
     ftts.voice = ftts.voicetbl[hv.SenderString] or ftts.voicetbl[""]
     ftts.sock:send([[(voice_]] .. ftts.voice .. [[)
                      (Param.set 'Duration_Stretch 0.8)
@@ -92,7 +85,7 @@ if not fv:isValid() or fv.Filename:match("emptymsg.wav") then
                           
                         -- create test double output (paste in Scheme block)
                         --(utt.save.wave utt "/tmp/festival.wav")
-    if tts_debug then tts_debug("Msg:\n" .. hv.Message:sub(1,10) .. "\n...\n" .. hv.Message:sub(-10)) end
+    if ftts.debug then ftts.debug("Msg:\n" .. hv.Message:sub(1,10) .. "\n...\n" .. hv.Message:sub(-10)) end
 end
 ]
 
@@ -105,20 +98,14 @@ local _,_,recv = ftts.sock:receive("*a")
 
 -- most frames will get empty string, ignore, also errors & voice change confirmations
 if recv and (recv ~= "") and ftts.voice and (not recv:match(ftts.voice)) then
-    -- open buffer file, if not open from previous frame
-    if not ftts.ofile then
+    -- start buffer, if not present from previous frame
+    if not ftts.buf then
         -- but close the old sound first
-        if ftts.soundfile and ftts.sound then
-            ftts.sound:stop()
-            ftts.soundfile:unload()
-            ftts.soundfile = nil
-            ftts.sound = nil
+        if ftts.stream then
+            ftts.stream:close()
+            ftts.stream = nil
         end
-        ftts.ofile = ftts.io.open(ftts.rotten_portability_path .. ftts.buf, "wb")
-        if tts_debug then 
-            tts_debug("Wav buffer output file opened:")
-            tts_debug(ftts.ofile) 
-        end
+        ftts.buf = {""}
     end
     
     -- behold the format of a one-frame festival response...
@@ -130,32 +117,25 @@ if recv and (recv ~= "") and ftts.voice and (not recv:match(ftts.voice)) then
     -- so it will end & then start in the middle of the wav
     -- so only cut those substrings if they're really useless
     if not pro:match("WV") then
-        ftts.ofile:write(pro)
+        table.insert(ftts.buf, pro)
     end
-    ftts.ofile:write(wav)    
+    table.insert(ftts.buf, wav)
     if not epi:match("ft_StUfF_keyLP.+") then
-        ftts.ofile:write(epi)
+        table.insert(ftts.buf, epi)
     end
-    ftts.ofile:flush()
     
-    if tts_debug then tts_debug("Prologue ".. pro .. "\nEpilogue: " .. epi) end
+    if ftts.debug then ftts.debug("Prologue ".. pro .. "\nEpilogue: " .. epi) end
 
     -- if response has epilogue & so is completely received
     -- this leaves the corner case of timeout during epilogue
     -- which will corrupt this & next wav
     -- TBD fix sometime
     if epi:match("ft_StUfF_keyLP.+") then
-        -- close & release
-        ftts.ofile:close()
-        ftts.ofile = nil
+        -- collect, stream, release
+        ftts.stream = ts.openAudioStreamMem(table.concat(ftts.buf), AUDIOSTREAM_VOICE)
+        ftts.buf = nil
         
-        -- load and play as voice
-        ftts.soundfile = ad.loadSoundfile(ftts.buf)
-        if tts_debug then
-            tts_debug("Buf is valid audio:")
-            tts_debug(ftts.soundfile:isValid())
-        end
-        ftts.sound = ftts.soundfile:play(ad.MasterVoiceVolume)
+        ftts.stream:play()
     end
 end
 ]
